@@ -36,7 +36,7 @@ function InjectCSS() {
   return <style dangerouslySetInnerHTML={{ __html: css }} />;
 }
 
-export function DlhdPlayer({ title, src }) {
+export function DlhdMediaPlayer({ title, src }) {
   return (
     <>
       <InjectCSS />
