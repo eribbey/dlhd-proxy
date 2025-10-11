@@ -2,7 +2,7 @@ import React from 'react';
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/audio.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
-import { MediaPlayer, MediaProvider, Poster, Captions } from "@vidstack/react"
+import { MediaPlayer, MediaProvider, Poster, Captions } from "@vidstack/react";
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
 
 
@@ -36,7 +36,7 @@ function InjectCSS() {
   return <style dangerouslySetInnerHTML={{ __html: css }} />;
 }
 
-export function Player({ title, src }) {
+export function DlhdPlayer({ title, src }) {
   return (
     <>
       <InjectCSS />
