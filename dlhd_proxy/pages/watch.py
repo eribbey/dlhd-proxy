@@ -185,7 +185,7 @@ def watch() -> rx.Component:
     )
 
     unavailable = rx.vstack(
-        rx.icon("alert-triangle", size=32),
+        rx.icon("triangle-alert", size=32),
         rx.heading("Channel unavailable", size="5"),
         rx.text(
             "This channel could not be found. Please return to the channel list.",
