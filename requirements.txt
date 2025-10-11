@@ -1,6 +1,6 @@
-reflex==0.8.7
-curl-cffi==0.11.4
+reflex==0.8.14.post1
+curl-cffi==0.13.0
 httpx[http2]==0.28.1
-python-dateutil==2.9.0
-fastapi==0.116.1
-pytest==8.3.3
+python-dateutil==2.9.0.post0
+fastapi==0.119.0
+pytest==8.4.2
