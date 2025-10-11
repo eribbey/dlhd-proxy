@@ -44,13 +44,23 @@ docker run -p 3000:3000 dlhd-proxy
 ### Environment Variables
 
 - **PORT**: Set a custom port for the server.
-- **API_URL**: Set the domain or IP where the server is reachable.
+- **API_URL** / **PUBLIC_URL**: Set the domain, IP, or reverse-proxy URL where
+  the server is reachable. `PUBLIC_URL` takes priority when both variables are
+  set.
 - **SOCKS5**: Proxy DLHD traffic through a SOCKS5 server if needed.
 - **PROXY_CONTENT**: Proxy video content itself through your server (optional).
 - **TZ**: Timezone used for schedules and guide generation (e.g., `America/New_York`).
 - **GUIDE_UPDATE**: Daily time (`HH:MM`) to refresh `guide.xml`.
 
 Edit the `.env` for docker compose.
+
+#### Public URL from the web interface
+
+You can also configure the externally reachable URL from the **Settings** page
+inside the application. This value is used by the web player, generated
+playlist links, and logo proxies. Leave the field blank to fall back to the
+server's default address. If `API_URL` or `PUBLIC_URL` is defined in the
+container environment it will override the value saved in the UI.
 
 ### Channel Selection Persistence
 
@@ -73,6 +83,7 @@ docker run -e PROXY_CONTENT=FALSE -e API_URL=https://example.com -e SOCKS5=user:
 - **🏠 Home**: Browse and search for TV channels.
 - **📺 Live Events**: Quickly find channels broadcasting live events and sports.
 - **📥 Playlist Download**: Download the `playlist.m3u8` file for integration with media players.
+- **⚙️ Settings**: Configure the public URL used by the application when running behind a reverse proxy.
 
 ---
 

@@ -16,6 +16,7 @@ from starlette.background import BackgroundTask
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from dlhd_proxy.step_daddy import Channel, StepDaddy
+from dlhd_proxy import settings as app_settings
 from rxconfig import config
 from .utils import urlsafe_base64_decode
 
@@ -36,6 +37,8 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger(__name__)
+
+app_settings.apply_initial_settings()
 
 fastapi_app = FastAPI()
 
@@ -234,6 +237,24 @@ def get_enabled_channels() -> list[Channel]:
     """Return only the channels that are currently enabled."""
     selected = get_selected_channel_ids()
     return [ch for ch in step_daddy.channels if ch.id in selected]
+
+
+def get_public_url() -> str:
+    """Return the resolved public URL used for playlist and stream links."""
+
+    return app_settings.get_public_url()
+
+
+def update_public_url(url: str) -> str:
+    """Persist a new public URL and return the active value."""
+
+    return app_settings.set_public_url(url)
+
+
+def public_url_has_env_override() -> bool:
+    """Return ``True`` if environment variables override the stored public URL."""
+
+    return app_settings.has_env_override()
 
 
 def get_channel(channel_id: str) -> Channel | None:
