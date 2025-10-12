@@ -2,6 +2,8 @@ import React from 'react';
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/audio.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
+import '@vidstack/react/player/providers/hls';
+import '@vidstack/react/player/engines/hls';
 import { MediaPlayer, MediaProvider, Poster, Captions } from "@vidstack/react";
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
 
