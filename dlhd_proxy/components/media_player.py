@@ -5,7 +5,7 @@ from reflex.utils.imports import ImportVar
 
 class MediaPlayer(NoSSRComponent):
     library = "/public/player"
-    lib_dependencies: list[str] = ["@vidstack/react@next"]
+    lib_dependencies: list[str] = ["@vidstack/react@next", "hls.js@^1.5.0"]
     tag = "DlhdProxyMediaPlayer"
     title: rx.Var[str]
     src: rx.Var[str]
