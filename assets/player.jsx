@@ -42,13 +42,14 @@ export function DlhdProxyMediaPlayer({ title, src }) {
       <InjectCSS />
       <MediaPlayer
         title={title}
-        src={{ src, type: 'application/x-mpegURL' }}
+        src={{ src, type: 'application/vnd.apple.mpegurl' }}
         viewType='video'
         streamType='live'
         logLevel='warn'
         playsInline
         autoplay
         muted
+        crossOrigin="anonymous"
       >
         <MediaProvider>
           <Poster className="vds-poster" />
