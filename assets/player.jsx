@@ -36,7 +36,18 @@ function InjectCSS() {
   return <style dangerouslySetInnerHTML={{ __html: css }} />;
 }
 
+async function loadHlsLibrary() {
+  const mod = await import('hls.js');
+  return mod?.default ?? mod;
+}
+
 export function DlhdProxyMediaPlayer({ title, src }) {
+  const handleProviderChange = React.useCallback((provider) => {
+    if (provider && typeof provider.type === 'string' && provider.type.includes('hls')) {
+      provider.library = loadHlsLibrary;
+    }
+  }, []);
+
   return (
     <>
       <InjectCSS />
@@ -53,6 +64,7 @@ export function DlhdProxyMediaPlayer({ title, src }) {
         autoplay
         muted
         crossOrigin="anonymous"
+        onProviderChange={handleProviderChange}
       >
         <MediaProvider>
           <Poster className="vds-poster" />
