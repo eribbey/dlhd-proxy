@@ -42,7 +42,10 @@ export function DlhdProxyMediaPlayer({ title, src }) {
       <InjectCSS />
       <MediaPlayer
         title={title}
-        src={{ src, type: 'application/vnd.apple.mpegurl' }}
+        src={[
+          { src, type: 'application/vnd.apple.mpegurl' },
+          { src, type: 'application/x-mpegURL' },
+        ]}
         viewType='video'
         streamType='live'
         logLevel='warn'
