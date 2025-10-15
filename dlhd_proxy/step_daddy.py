@@ -34,7 +34,7 @@ class StepDaddy:
             self._session = AsyncSession(proxy=f"socks5://{socks5}")
         else:
             self._session = AsyncSession()
-        self._base_url = "https://thedaddy.top"
+        self._base_url = "https://daddylivestream.com"
         self.channels: List[Channel] = []
         meta_path = Path(__file__).with_name("meta.json")
         try:
