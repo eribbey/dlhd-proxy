@@ -3,7 +3,7 @@ import logging
 import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urljoin, urlparse
 
 import reflex as rx
 from curl_cffi import AsyncSession
@@ -304,19 +304,56 @@ class StepDaddy:
         )
         m3u8.raise_for_status()
 
-        playlist_lines: List[str] = []
-        for line in (m3u8.text or "").splitlines():
-            if line.startswith("#EXT-X-KEY:"):
-                match = re.search(r'URI="(.*?)"', line)
-                if match:
-                    original_url = match.group(1)
-                    replacement = f"{config.api_url}/key/{encrypt(original_url)}/{encrypt(urlparse(source_url).netloc)}"
-                    line = line.replace(original_url, replacement)
-            elif line.startswith("http") and config.proxy_content:
-                line = f"{config.api_url}/content/{encrypt(line)}"
-            playlist_lines.append(line)
+        return self._transform_playlist(m3u8.text or "", server_url, source_url)
 
-        return "\n".join(playlist_lines) + "\n"
+    def _transform_playlist(self, playlist: str, playlist_url: str, source_url: str) -> str:
+        """Rewrite playlist URLs to ensure they are reachable by the player."""
+
+        referer_host = urlparse(source_url).netloc or urlparse(playlist_url).netloc
+        encrypted_host = encrypt(referer_host) if referer_host else ""
+
+        def absolute_url(value: str) -> str:
+            if not value:
+                return value
+            if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", value):
+                return value
+            return urljoin(playlist_url, value)
+
+        def proxied_url(value: str) -> str:
+            resolved = absolute_url(value)
+            if config.proxy_content:
+                return f"{config.api_url}/content/{encrypt(resolved)}"
+            return resolved
+
+        def replace_uri_attribute(line: str, endpoint: str | None = None) -> str:
+            pattern = r'URI="(.*?)"'
+
+            def repl(match: re.Match[str]) -> str:
+                original = match.group(1)
+                target = absolute_url(original)
+                if endpoint == "key":
+                    host = encrypted_host
+                    target = f"{config.api_url}/key/{encrypt(target)}/{host}"
+                elif endpoint == "content":
+                    target = proxied_url(original)
+                return match.group(0).replace(original, target)
+
+            return re.sub(pattern, repl, line)
+
+        lines: List[str] = []
+        for raw_line in playlist.splitlines():
+            line = raw_line
+            if line.startswith("#EXT-X-KEY:") or line.startswith("#EXT-X-SESSION-KEY:"):
+                line = replace_uri_attribute(line, endpoint="key")
+            elif line.startswith("#EXT-X-MAP:"):
+                line = replace_uri_attribute(line, endpoint="content")
+            elif "URI=\"" in line:
+                line = replace_uri_attribute(line, endpoint="content")
+            elif line and not line.startswith("#"):
+                line = proxied_url(line)
+            lines.append(line)
+
+        return "\n".join(lines) + "\n"
 
     async def key(self, url: str, host: str) -> bytes:
         """Fetch and return the key referenced in the playlist."""
