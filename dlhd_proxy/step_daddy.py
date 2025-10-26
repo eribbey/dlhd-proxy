@@ -20,6 +20,14 @@ from rxconfig import config
 
 logger = logging.getLogger(__name__)
 
+HLS_PROXY_EXTENSIONS = {".m3u8", ".ts", ".aac", ".vtt"}
+
+
+def _is_hls_path(path: str) -> bool:
+    """Return ``True`` when *path* points to a proxyable HLS asset."""
+
+    return any(path.endswith(ext) for ext in HLS_PROXY_EXTENSIONS)
+
 
 class Channel(rx.Base):
     id: str
@@ -141,7 +149,7 @@ class StepDaddy:
             elif line.startswith("http") and config.proxy_content:
                 parsed_url = urlparse(line)
                 path = (parsed_url.path or "").lower()
-                if not path.endswith(".php"):
+                if _is_hls_path(path):
                     line = f"{config.api_url}/content/{encrypt(line)}"
             m3u8_data += line + "\n"
         return m3u8_data

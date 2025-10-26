@@ -120,6 +120,8 @@ def test_stream_proxies_ts_segments_but_not_php(monkeypatch):
     m3u8_text = """#EXTM3U
 #EXT-X-KEY:METHOD=AES-128,URI=\"https://example.com/key.key\"
 https://cdn.example.com/video1.ts
+https://cdn.example.com/variant.m3u8
+https://cdn.example.com/thumbnail.png
 https://api.example.com/segment.php?id=1
 """
 
@@ -153,5 +155,8 @@ https://api.example.com/segment.php?id=1
     playlist = asyncio.run(step_daddy.stream("42"))
 
     ts_line = f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts)"
+    m3u8_line = f"{config.api_url}/content/enc(https://cdn.example.com/variant.m3u8)"
     assert ts_line in playlist
+    assert m3u8_line in playlist
+    assert "https://cdn.example.com/thumbnail.png" in playlist
     assert "https://api.example.com/segment.php?id=1" in playlist
