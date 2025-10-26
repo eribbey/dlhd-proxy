@@ -134,7 +134,7 @@ class StepDaddy:
             server_url, headers=self._headers(quote(str(source_url)))
         )
         m3u8_data = ""
-        for line in m3u8.text.split("\n"):
+        for line in m3u8.text.splitlines():
             if line.startswith("#EXT-X-KEY:"):
                 original_url = re.search(r'URI="(.*?)"', line).group(1)
                 line = line.replace(original_url, f"{config.api_url}/key/{encrypt(original_url)}/{encrypt(urlparse(source_url).netloc)}")
