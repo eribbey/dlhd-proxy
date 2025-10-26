@@ -103,3 +103,55 @@ def test_load_channels_logs_request_status(monkeypatch, caplog):
         in message
         for message in messages
     )
+
+
+def test_stream_proxies_ts_segments_but_not_php(monkeypatch):
+    class FakeResponse:
+        def __init__(self, text: str = "", status_code: int = 200, json_data=None, content: bytes = b""):
+            self.text = text
+            self.status_code = status_code
+            self._json_data = json_data
+            self.content = content
+
+        def json(self):
+            return self._json_data
+
+    iframe_html = '<iframe src="https://example.com/player.html" width="600"></iframe>'
+    m3u8_text = """#EXTM3U
+#EXT-X-KEY:METHOD=AES-128,URI=\"https://example.com/key.key\"
+https://cdn.example.com/video1.ts
+https://api.example.com/segment.php?id=1
+"""
+
+    responses = iter(
+        [
+            FakeResponse(text=iframe_html),
+            FakeResponse(text='const CHANNEL_KEY = "abc123";'),
+            FakeResponse(text="ok", status_code=200),
+            FakeResponse(json_data={"server_key": "edge1/"}),
+            FakeResponse(text=m3u8_text),
+        ]
+    )
+
+    async def fake_get(_self, url: str, **_kwargs):
+        try:
+            return next(responses)
+        except StopIteration:  # pragma: no cover - unexpected extra request
+            raise AssertionError(f"Unexpected request to {url}")
+
+    step_daddy = StepDaddy()
+    monkeypatch.setattr("dlhd_proxy.step_daddy.decode_bundle", lambda _text: {
+        "b_ts": "123",
+        "b_sig": "abc",
+        "b_rnd": "rnd",
+        "b_host": "https://auth.example.com/",
+    })
+    monkeypatch.setattr("dlhd_proxy.step_daddy.encrypt", lambda value: f"enc({value})")
+    monkeypatch.setattr(config, "proxy_content", True, raising=False)
+    monkeypatch.setattr(step_daddy, "_get", fake_get.__get__(step_daddy, StepDaddy))
+
+    playlist = asyncio.run(step_daddy.stream("42"))
+
+    ts_line = f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts)"
+    assert ts_line in playlist
+    assert "https://api.example.com/segment.php?id=1" in playlist
