@@ -117,13 +117,11 @@ def test_stream_proxies_ts_segments_but_not_php(monkeypatch):
             return self._json_data
 
     iframe_html = '<iframe src="https://example.com/player.html" width="600"></iframe>'
-    m3u8_lines = [
-        "#EXTM3U",
-        "#EXT-X-KEY:METHOD=AES-128,URI=\"https://example.com/key.key\"",
-        "https://cdn.example.com/video1.ts",
-        "https://api.example.com/segment.php?id=1",
-    ]
-    m3u8_text = "\r\n".join(m3u8_lines)
+    m3u8_text = """#EXTM3U
+#EXT-X-KEY:METHOD=AES-128,URI=\"https://example.com/key.key\"
+https://cdn.example.com/video1.ts
+https://api.example.com/segment.php?id=1
+"""
 
     responses = iter(
         [
