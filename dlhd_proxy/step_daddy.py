@@ -139,7 +139,10 @@ class StepDaddy:
                 original_url = re.search(r'URI="(.*?)"', line).group(1)
                 line = line.replace(original_url, f"{config.api_url}/key/{encrypt(original_url)}/{encrypt(urlparse(source_url).netloc)}")
             elif line.startswith("http") and config.proxy_content:
-                line = f"{config.api_url}/content/{encrypt(line)}"
+                parsed_url = urlparse(line)
+                path = (parsed_url.path or "").lower()
+                if not path.endswith(".php"):
+                    line = f"{config.api_url}/content/{encrypt(line)}"
             m3u8_data += line + "\n"
         return m3u8_data
 
