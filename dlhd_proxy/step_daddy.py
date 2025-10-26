@@ -3,6 +3,7 @@ import html
 import logging
 import re
 from importlib import resources
+from pathlib import Path
 from typing import Iterable, List
 from urllib.parse import parse_qs, quote, urlparse, urlsplit
 
@@ -19,6 +20,24 @@ from rxconfig import config
 
 
 logger = logging.getLogger(__name__)
+
+PROXYABLE_HLS_EXTENSIONS = {
+    ".m3u8",
+    ".ts",
+    ".aac",
+    ".vtt",
+    ".m4s",
+    ".m4a",
+    ".mp4",
+    ".mp3",
+}
+
+
+def _is_hls_path(path: str) -> bool:
+    """Return ``True`` when *path* points to a proxyable HLS asset."""
+
+    suffix = Path(path).suffix.lower()
+    return suffix in PROXYABLE_HLS_EXTENSIONS
 
 
 class Channel(rx.Base):
@@ -133,18 +152,31 @@ class StepDaddy:
         m3u8 = await self._get(
             server_url, headers=self._headers(quote(str(source_url)))
         )
-        m3u8_data = ""
+        rewritten_lines: list[str] = []
         for line in m3u8.text.splitlines():
             if line.startswith("#EXT-X-KEY:"):
                 original_url = re.search(r'URI="(.*?)"', line).group(1)
-                line = line.replace(original_url, f"{config.api_url}/key/{encrypt(original_url)}/{encrypt(urlparse(source_url).netloc)}")
-            elif line.startswith("http") and config.proxy_content:
+                line = line.replace(
+                    original_url,
+                    f"{config.api_url}/key/{encrypt(original_url)}/{encrypt(urlparse(source_url).netloc)}",
+                )
+                rewritten_lines.append(line)
+                continue
+
+            if line.startswith("http") and config.proxy_content:
                 parsed_url = urlparse(line)
                 path = (parsed_url.path or "").lower()
-                if not path.endswith(".php"):
-                    line = f"{config.api_url}/content/{encrypt(line)}"
-            m3u8_data += line + "\n"
-        return m3u8_data
+                if _is_hls_path(path):
+                    rewritten_lines.append(f"{config.api_url}/content/{encrypt(line)}")
+                    continue
+
+                if rewritten_lines and rewritten_lines[-1].startswith("#EXTINF"):
+                    rewritten_lines.pop()
+                continue
+
+            rewritten_lines.append(line)
+
+        return "\n".join(rewritten_lines) + "\n"
 
     async def key(self, url: str, host: str):
         url = decrypt(url)
