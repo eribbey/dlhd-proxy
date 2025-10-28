@@ -173,11 +173,13 @@ https://api.example.com/segment.php?id=1
     assert m3u8_line in playlist
     assert "https://cdn.example.com/thumbnail.png" not in playlist
     assert "https://api.example.com/segment.php?id=1" not in playlist
-    assert "#EXTINF:1.0," in playlist
-    assert "#EXTINF:2.0," in playlist
+    assert "#EXTINF:4.0," in playlist
+    assert "#EXTINF:8.0," in playlist
+    assert "#EXTINF:1.0," not in playlist
+    assert "#EXTINF:2.0," not in playlist
 
 
-def test_stream_preserves_metadata_for_non_hls_urls(monkeypatch):
+def test_stream_removes_metadata_for_non_hls_urls(monkeypatch):
     iframe_html = '<iframe src="https://example.com/player.html" width="600"></iframe>'
     m3u8_text = """#EXTM3U
 #EXTINF:4.0,
@@ -224,8 +226,8 @@ https://cdn.example.com/thumbnail.png
 
     playlist = asyncio.run(step_daddy.stream("42"))
 
-    assert "#EXTINF:4.0," in playlist
-    assert "#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:00Z" in playlist
+    assert "#EXTINF:4.0," not in playlist
+    assert "#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:00Z" not in playlist
     assert "https://cdn.example.com/thumbnail.png" not in playlist
 
 

@@ -153,6 +153,7 @@ class StepDaddy:
             server_url, headers=self._headers(quote(str(source_url)))
         )
         rewritten_lines: list[str] = []
+        segment_start_index: int | None = None
         for line in m3u8.text.splitlines():
             if line.startswith("#EXT-X-KEY:"):
                 original_url = re.search(r'URI="(.*?)"', line).group(1)
@@ -163,15 +164,28 @@ class StepDaddy:
                 rewritten_lines.append(line)
                 continue
 
+            if line.startswith("#EXTINF") or line.startswith("#EXT-X-PROGRAM-DATE-TIME") or line.startswith(
+                "#EXT-X-BYTERANGE"
+            ):
+                if segment_start_index is None:
+                    segment_start_index = len(rewritten_lines)
+                rewritten_lines.append(line)
+                continue
+
             if line.startswith("http"):
                 parsed_url = urlparse(line)
                 path = (parsed_url.path or "").lower()
                 if _is_hls_path(path):
                     rewritten_lines.append(f"{config.api_url}/content/{encrypt(line)}")
+                    segment_start_index = None
                     continue
 
+                if segment_start_index is not None:
+                    del rewritten_lines[segment_start_index:]
+                    segment_start_index = None
                 continue
 
+            segment_start_index = None
             rewritten_lines.append(line)
 
         return "\n".join(rewritten_lines) + "\n"
