@@ -165,7 +165,8 @@ class StepDaddy:
                 continue
 
             if line.startswith("#EXTINF"):
-                segment_start_index = len(rewritten_lines)
+                if segment_start_index is None:
+                    segment_start_index = len(rewritten_lines)
                 rewritten_lines.append(line)
                 continue
 
