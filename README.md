@@ -24,7 +24,13 @@ This is a fork of a self-hosted IPTV proxy built with [Reflex](https://reflex.de
 
 1. Install Docker and Docker Compose.
 2. Clone the repository and change into the project directory.
-3. Start the application with Docker Compose:
+3. Copy the example configuration files and adjust them for your environment:
+   ```bash
+   cp .env.example .env
+   cp docker-compose.yml.example docker-compose.yml
+   ```
+   The copied files are git-ignored so any local tweaks won't appear as repository changes.
+4. Start the application with Docker Compose:
    ```bash
    docker compose up -d
    ```
@@ -52,7 +58,7 @@ docker run -p 3000:3000 dlhd-proxy
 - **TZ**: Timezone used for schedules and guide generation (e.g., `America/New_York`).
 - **GUIDE_UPDATE**: Daily time (`HH:MM`) to refresh `guide.xml`.
 
-Edit the `.env` for docker compose.
+Copy `.env.example` to `.env` (as shown above) and edit the local `.env` to customise your environment variables.
 
 ### Channel Selection Persistence
 

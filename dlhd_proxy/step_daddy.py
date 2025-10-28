@@ -163,16 +163,16 @@ class StepDaddy:
                 rewritten_lines.append(line)
                 continue
 
-            if line.startswith("http") and config.proxy_content:
+            if line.startswith("http"):
                 parsed_url = urlparse(line)
                 path = (parsed_url.path or "").lower()
                 if _is_hls_path(path):
                     rewritten_lines.append(f"{config.api_url}/content/{encrypt(line)}")
                     continue
 
-                if rewritten_lines and rewritten_lines[-1].startswith("#EXTINF"):
+                if config.proxy_content and rewritten_lines and rewritten_lines[-1].startswith("#EXTINF"):
                     rewritten_lines.pop()
-                continue
+                    continue
 
             rewritten_lines.append(line)
 
