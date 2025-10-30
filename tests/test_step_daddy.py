@@ -184,6 +184,57 @@ https://cdn.example.com/segment
     assert "#EXTINF:2.0," in playlist
 
 
+def test_stream_rewrites_ext_x_map(monkeypatch):
+    iframe_html = '<iframe src="https://example.com/player.html" width="600"></iframe>'
+    m3u8_text = """#EXTM3U
+#EXT-X-MAP:URI=\"init/init.mp4\"
+#EXTINF:4.0,
+segment1.m4s
+"""
+
+    class FakeResponse:
+        def __init__(self, text: str = "", status_code: int = 200, json_data=None):
+            self.text = text
+            self.status_code = status_code
+            self._json_data = json_data
+
+        def json(self):
+            return self._json_data
+
+    responses = iter(
+        [
+            FakeResponse(text=iframe_html),
+            FakeResponse(text='const CHANNEL_KEY = "abc123";'),
+            FakeResponse(text="ok", status_code=200),
+            FakeResponse(json_data={"server_key": "edge1/"}),
+            FakeResponse(text=m3u8_text),
+        ]
+    )
+
+    async def fake_get(_self, url: str, **_kwargs):
+        try:
+            return next(responses)
+        except StopIteration:  # pragma: no cover - unexpected extra request
+            raise AssertionError(f"Unexpected request to {url}")
+
+    step_daddy = StepDaddy()
+    monkeypatch.setattr("dlhd_proxy.step_daddy.decode_bundle", lambda _text: {
+        "b_ts": "123",
+        "b_sig": "abc",
+        "b_rnd": "rnd",
+        "b_host": "https://auth.example.com/",
+    })
+    monkeypatch.setattr("dlhd_proxy.step_daddy.encrypt", lambda value: f"enc({value})")
+    monkeypatch.setattr(step_daddy, "_get", fake_get.__get__(step_daddy, StepDaddy))
+
+    playlist = asyncio.run(step_daddy.stream("42"))
+
+    expected_map = (
+        f'#EXT-X-MAP:URI="{config.api_url}/content/enc(https://edge1/new.newkso.ru/edge1/abc123/init/init.mp4).mp4"'
+    )
+    assert expected_map in playlist
+
+
 def test_stream_proxies_hls_when_proxy_disabled(monkeypatch):
     iframe_html = '<iframe src="https://example.com/embed" width="100%" height="100%"></iframe>'
     m3u8_text = """#EXTM3U

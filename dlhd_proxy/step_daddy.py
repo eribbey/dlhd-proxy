@@ -5,7 +5,7 @@ import re
 from importlib import resources
 from pathlib import Path
 from typing import Iterable, List
-from urllib.parse import parse_qs, quote, urlparse, urlsplit
+from urllib.parse import parse_qs, quote, urljoin, urlparse, urlsplit
 
 import reflex as rx
 from curl_cffi import AsyncSession
@@ -181,6 +181,7 @@ class StepDaddy:
             server_url, headers=self._headers(quote(str(source_url)))
         )
         rewritten_lines: list[str] = []
+        playlist_url = server_url
         for line in m3u8.text.splitlines():
             if line.startswith("#EXT-X-KEY:"):
                 original_url = re.search(r'URI="(.*?)"', line).group(1)
@@ -188,6 +189,20 @@ class StepDaddy:
                     original_url,
                     f"{config.api_url}/key/{encrypt(original_url)}/{encrypt(urlparse(source_url).netloc)}",
                 )
+                rewritten_lines.append(line)
+                continue
+
+            if line.startswith("#EXT-X-MAP:"):
+                match = re.search(r'URI="(.*?)"', line)
+                if match:
+                    original_url = match.group(1)
+                    resolved_url = urljoin(playlist_url, original_url)
+                    suffix = _hls_suffix(urlparse(resolved_url).path)
+                    if suffix:
+                        proxied = (
+                            f"{config.api_url}/content/{encrypt(resolved_url)}{suffix}"
+                        )
+                        line = line.replace(original_url, proxied)
                 rewritten_lines.append(line)
                 continue
 

@@ -13,6 +13,7 @@ This is a fork of a self-hosted IPTV proxy built with [Reflex](https://reflex.de
 - **📱 Stream Anywhere**: Watch TV channels on any device via the web or media players.
 - **🔎 Event Search**: Quickly find the right channel for live events or sports.
 - **📄 Playlist Integration**: Download the `playlist.m3u8` and use it with Jellyfin or any IPTV client.
+- **🔒 Private Playback**: Browser streaming fetches keys, init segments, and media chunks through the proxy so your device never contacts the upstream host directly.
 - **🗓️ XMLTV Guide**: Access scheduling information at `guide.xml` for use with media servers like Jellyfin.
 - **✅ Channel Filtering**: Select which channels appear in the playlist and generated guide.
 - **🕒 Daily Guide Updates**: Automatically refresh `guide.xml` once per day at a user-defined time.
