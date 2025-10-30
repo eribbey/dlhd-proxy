@@ -170,10 +170,10 @@ https://cdn.example.com/segment
     playlist = asyncio.run(step_daddy.stream("42"))
 
     ts_line = (
-        f"{config.api_url}/content/ts/enc(https://cdn.example.com/video1.ts)"
+        f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts).ts"
     )
     m3u8_line = (
-        f"{config.api_url}/content/m3u8/enc(https://cdn.example.com/variant.m3u8)"
+        f"{config.api_url}/content/enc(https://cdn.example.com/variant.m3u8).m3u8"
     )
     assert ts_line in playlist
     assert m3u8_line in playlist
@@ -234,10 +234,10 @@ https://cdn.example.com/thumbnail.png
     playlist = asyncio.run(step_daddy.stream("42"))
 
     ts_line = (
-        f"{config.api_url}/content/ts/enc(https://cdn.example.com/video1.ts)"
+        f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts).ts"
     )
     m3u8_line = (
-        f"{config.api_url}/content/m3u8/enc(https://cdn.example.com/variant.m3u8)"
+        f"{config.api_url}/content/enc(https://cdn.example.com/variant.m3u8).m3u8"
     )
     assert ts_line in playlist
     assert m3u8_line in playlist

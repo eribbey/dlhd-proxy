@@ -196,9 +196,8 @@ class StepDaddy:
                 path = (parsed_url.path or "")
                 suffix = _hls_suffix(path)
                 if suffix:
-                    sanitized = suffix.lstrip(".")
                     rewritten_lines.append(
-                        f"{config.api_url}/content/{sanitized}/{encrypt(line)}"
+                        f"{config.api_url}/content/{encrypt(line)}{suffix}"
                     )
                     continue
 
@@ -226,7 +225,15 @@ class StepDaddy:
 
     @staticmethod
     def content_url(path: str):
-        return decrypt(path)
+        try:
+            return decrypt(path)
+        except Exception:
+            suffix = Path(path or "").suffix
+            if suffix:
+                stripped = path[: -len(suffix)]
+                if stripped:
+                    return decrypt(stripped)
+            raise
 
     def playlist(self, channels: Iterable[Channel] | None = None):
         data = "#EXTM3U\n"
