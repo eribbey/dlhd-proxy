@@ -231,3 +231,4 @@ https://cdn.example.com/thumbnail.png
     assert ts_line in playlist
     assert m3u8_line in playlist
     assert "https://cdn.example.com/thumbnail.png" not in playlist
+    assert "#EXTINF:1.0," not in playlist
