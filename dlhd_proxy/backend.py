@@ -169,8 +169,7 @@ async def key(url: str, host: str):
         return JSONResponse(content={"error": str(e)}, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@fastapi_app.get("/content/{path}")
-async def content(path: str):
+async def _proxy_content(path: str):
     try:
         url = step_daddy.content_url(path)
     except Exception as exc:
@@ -209,6 +208,16 @@ async def content(path: str):
         media_type=media_type,
         background=BackgroundTask(response.aclose),
     )
+
+
+@fastapi_app.get("/content/{suffix}/{path}")
+async def content_with_suffix(suffix: str, path: str):  # pragma: no cover - alias
+    return await _proxy_content(path)
+
+
+@fastapi_app.get("/content/{path}")
+async def content(path: str):
+    return await _proxy_content(path)
 
 
 async def update_channels():

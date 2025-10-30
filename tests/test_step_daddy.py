@@ -105,7 +105,7 @@ def test_load_channels_logs_request_status(monkeypatch, caplog):
     )
 
 
-def test_stream_proxies_ts_segments_but_not_php(monkeypatch):
+def test_stream_filters_non_hls_assets_but_retains_unknown_segments(monkeypatch):
     class FakeResponse:
         def __init__(self, text: str = "", status_code: int = 200, json_data=None, content: bytes = b""):
             self.text = text
@@ -127,6 +127,8 @@ https://cdn.example.com/variant.m3u8
 https://cdn.example.com/thumbnail.png
 #EXTINF:2.0,
 https://api.example.com/segment.php?id=1
+#EXTINF:3.0,
+https://cdn.example.com/segment
 """
 
     class FakeResponse:
@@ -167,14 +169,19 @@ https://api.example.com/segment.php?id=1
 
     playlist = asyncio.run(step_daddy.stream("42"))
 
-    ts_line = f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts)"
-    m3u8_line = f"{config.api_url}/content/enc(https://cdn.example.com/variant.m3u8)"
+    ts_line = (
+        f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts).ts"
+    )
+    m3u8_line = (
+        f"{config.api_url}/content/enc(https://cdn.example.com/variant.m3u8).m3u8"
+    )
     assert ts_line in playlist
     assert m3u8_line in playlist
     assert "https://cdn.example.com/thumbnail.png" not in playlist
-    assert "https://api.example.com/segment.php?id=1" not in playlist
+    assert "https://api.example.com/segment.php?id=1" in playlist
+    assert "https://cdn.example.com/segment" in playlist
     assert "#EXTINF:1.0," not in playlist
-    assert "#EXTINF:2.0," not in playlist
+    assert "#EXTINF:2.0," in playlist
 
 
 def test_stream_proxies_hls_when_proxy_disabled(monkeypatch):
@@ -226,8 +233,12 @@ https://cdn.example.com/thumbnail.png
 
     playlist = asyncio.run(step_daddy.stream("42"))
 
-    ts_line = f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts)"
-    m3u8_line = f"{config.api_url}/content/enc(https://cdn.example.com/variant.m3u8)"
+    ts_line = (
+        f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts).ts"
+    )
+    m3u8_line = (
+        f"{config.api_url}/content/enc(https://cdn.example.com/variant.m3u8).m3u8"
+    )
     assert ts_line in playlist
     assert m3u8_line in playlist
     assert "https://cdn.example.com/thumbnail.png" not in playlist

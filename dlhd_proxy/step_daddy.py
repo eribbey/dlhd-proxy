@@ -32,12 +32,40 @@ PROXYABLE_HLS_EXTENSIONS = {
     ".mp3",
 }
 
+NON_HLS_SUFFIXES = {
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".bmp",
+    ".svg",
+    ".ico",
+    ".html",
+    ".htm",
+    ".css",
+    ".js",
+}
+
+
+def _hls_suffix(path: str) -> str | None:
+    """Return the known HLS suffix for *path* if present."""
+
+    suffix = Path(path or "").suffix.lower()
+    return suffix if suffix in PROXYABLE_HLS_EXTENSIONS else None
+
 
 def _is_hls_path(path: str) -> bool:
     """Return ``True`` when *path* points to a proxyable HLS asset."""
 
-    suffix = Path(path).suffix.lower()
-    return suffix in PROXYABLE_HLS_EXTENSIONS
+    return _hls_suffix(path) is not None
+
+
+def _is_blocklisted_path(path: str) -> bool:
+    """Return ``True`` when *path* should be dropped from playlists."""
+
+    suffix = Path(path or "").suffix.lower()
+    return suffix in NON_HLS_SUFFIXES
 
 
 class Channel(rx.Base):
@@ -165,13 +193,20 @@ class StepDaddy:
 
             if line.startswith("http"):
                 parsed_url = urlparse(line)
-                path = (parsed_url.path or "").lower()
-                if _is_hls_path(path):
-                    rewritten_lines.append(f"{config.api_url}/content/{encrypt(line)}")
+                path = (parsed_url.path or "")
+                suffix = _hls_suffix(path)
+                if suffix:
+                    rewritten_lines.append(
+                        f"{config.api_url}/content/{encrypt(line)}{suffix}"
+                    )
                     continue
 
-                if rewritten_lines and rewritten_lines[-1].startswith("#EXTINF"):
-                    rewritten_lines.pop()
+                if _is_blocklisted_path(path):
+                    if rewritten_lines and rewritten_lines[-1].startswith("#EXTINF"):
+                        rewritten_lines.pop()
+                    continue
+
+                rewritten_lines.append(line)
                 continue
 
             rewritten_lines.append(line)
@@ -190,7 +225,15 @@ class StepDaddy:
 
     @staticmethod
     def content_url(path: str):
-        return decrypt(path)
+        try:
+            return decrypt(path)
+        except Exception:
+            suffix = Path(path or "").suffix
+            if suffix:
+                stripped = path[: -len(suffix)]
+                if stripped:
+                    return decrypt(stripped)
+            raise
 
     def playlist(self, channels: Iterable[Channel] | None = None):
         data = "#EXTM3U\n"
