@@ -170,9 +170,9 @@ class StepDaddy:
                     rewritten_lines.append(f"{config.api_url}/content/{encrypt(line)}")
                     continue
 
-                if config.proxy_content and rewritten_lines and rewritten_lines[-1].startswith("#EXTINF"):
+                if rewritten_lines and rewritten_lines[-1].startswith("#EXTINF"):
                     rewritten_lines.pop()
-                    continue
+                continue
 
             rewritten_lines.append(line)
 
