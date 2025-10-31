@@ -59,6 +59,7 @@ docker run -p 3000:3000 dlhd-proxy
 - **PROXY_CONTENT**: Proxy video content itself through your server (optional).
 - **TZ**: Timezone used for schedules and guide generation (e.g., `America/New_York`).
 - **GUIDE_UPDATE**: Daily time (`HH:MM`) to refresh `guide.xml`.
+- **DLHD_PROXY_KEY_FILE** *(optional)*: Override the location of the persisted token encryption key (defaults to `data/token.key`).
 
 Copy `.env.example` to `.env` (as shown above) and edit the local `.env` to customise your environment variables.
 
