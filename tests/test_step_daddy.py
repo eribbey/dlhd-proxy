@@ -106,16 +106,6 @@ def test_load_channels_logs_request_status(monkeypatch, caplog):
 
 
 def test_stream_proxies_ts_segments_but_not_php(monkeypatch):
-    class FakeResponse:
-        def __init__(self, text: str = "", status_code: int = 200, json_data=None, content: bytes = b""):
-            self.text = text
-            self.status_code = status_code
-            self._json_data = json_data
-            self.content = content
-
-        def json(self):
-            return self._json_data
-
     iframe_html = '<iframe src="https://example.com/player.html" width="600"></iframe>'
     m3u8_text = """#EXTM3U
 #EXT-X-KEY:METHOD=AES-128,URI=\"https://example.com/key.key\"
@@ -138,23 +128,29 @@ https://api.example.com/segment.php?id=1
         def json(self):
             return self._json_data
 
-    responses = iter(
-        [
-            FakeResponse(text=iframe_html),
-            FakeResponse(text='const CHANNEL_KEY = "abc123";'),
-            FakeResponse(text="ok", status_code=200),
-            FakeResponse(json_data={"server_key": "edge1/"}),
-            FakeResponse(text=m3u8_text),
-        ]
-    )
+    def run_stream(*, force_extension: bool = False) -> str:
+        responses = iter(
+            [
+                FakeResponse(text=iframe_html),
+                FakeResponse(text='const CHANNEL_KEY = "abc123";'),
+                FakeResponse(text="ok", status_code=200),
+                FakeResponse(json_data={"server_key": "edge1/"}),
+                FakeResponse(text=m3u8_text),
+            ]
+        )
 
-    async def fake_get(_self, url: str, **_kwargs):
-        try:
-            return next(responses)
-        except StopIteration:  # pragma: no cover - unexpected extra request
-            raise AssertionError(f"Unexpected request to {url}")
+        async def fake_get(_self, url: str, **_kwargs):
+            try:
+                return next(responses)
+            except StopIteration:  # pragma: no cover - unexpected extra request
+                raise AssertionError(f"Unexpected request to {url}")
 
-    step_daddy = StepDaddy()
+        step_daddy = StepDaddy()
+        monkeypatch.setattr(step_daddy, "_get", fake_get.__get__(step_daddy, StepDaddy))
+        return asyncio.run(
+            step_daddy.stream("42", force_segment_extension=force_extension)
+        )
+
     monkeypatch.setattr("dlhd_proxy.step_daddy.decode_bundle", lambda _text: {
         "b_ts": "123",
         "b_sig": "abc",
@@ -163,13 +159,13 @@ https://api.example.com/segment.php?id=1
     })
     monkeypatch.setattr("dlhd_proxy.step_daddy.encrypt", lambda value: f"enc({value})")
     monkeypatch.setattr(config, "proxy_content", True, raising=False)
-    monkeypatch.setattr(step_daddy, "_get", fake_get.__get__(step_daddy, StepDaddy))
 
-    playlist = asyncio.run(step_daddy.stream("42"))
+    playlist = run_stream()
 
     ts_line = f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts)"
     m3u8_line = f"{config.api_url}/content/enc(https://cdn.example.com/variant.m3u8)"
-    php_line = (
+    php_line = f"{config.api_url}/content/enc(https://api.example.com/segment.php?id=1)"
+    synthetic_php_line = (
         f"{config.api_url}/content/enc(https://api.example.com/segment.php?id=1).ts"
     )
     playlist_lines = playlist.splitlines()
@@ -177,10 +173,14 @@ https://api.example.com/segment.php?id=1
     assert ts_line in playlist
     assert m3u8_line in playlist
     assert php_line in playlist
+    assert synthetic_php_line not in playlist
     assert "https://cdn.example.com/thumbnail.png" not in playlist
     assert "https://api.example.com/segment.php?id=1" not in playlist_lines
     assert "#EXTINF:1.0," not in playlist
     assert "#EXTINF:2.0," in playlist
+
+    playlist_with_extension = run_stream(force_extension=True)
+    assert synthetic_php_line in playlist_with_extension
 
 
 def test_stream_proxies_hls_when_proxy_disabled(monkeypatch):

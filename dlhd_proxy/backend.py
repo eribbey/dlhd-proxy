@@ -132,14 +132,28 @@ def set_selected_channel_ids(ids: list[str]) -> None:
 
 
 @fastapi_app.get("/stream/{channel_id}.m3u8")
-async def stream(channel_id: str, strict: bool = Query(True, description="When true, filter non-HLS assets.")):
+async def stream(
+    channel_id: str,
+    strict: bool = Query(True, description="When true, filter non-HLS assets."),
+    force_segment_extension: bool = Query(
+        False,
+        description=(
+            "When true, append a synthetic .ts suffix to proxied segment URLs for "
+            "clients that require known extensions."
+        ),
+    ),
+):
     if not channel_id:
         return JSONResponse(
             content={"error": "Channel id is required"},
             status_code=status.HTTP_400_BAD_REQUEST,
         )
     try:
-        playlist_body = await step_daddy.stream(channel_id, strict=strict)
+        playlist_body = await step_daddy.stream(
+            channel_id,
+            strict=strict,
+            force_segment_extension=force_segment_extension,
+        )
         return Response(
             content=playlist_body,
             media_type="application/vnd.apple.mpegurl",

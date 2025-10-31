@@ -133,7 +133,13 @@ class StepDaddy:
                 key=lambda channel: (channel.name.startswith("18"), channel.name),
             )
 
-    async def stream(self, channel_id: str, *, strict: bool = True):
+    async def stream(
+        self,
+        channel_id: str,
+        *,
+        strict: bool = True,
+        force_segment_extension: bool = False,
+    ):
         key = "CHANNEL_KEY"
         url = f"{self._base_url}/stream/stream-{channel_id}.php"
         response = await self._get(url, headers=self._headers())
@@ -221,7 +227,12 @@ class StepDaddy:
 
                     if expecting_segment_uri:
                         if config.proxy_content:
-                            rewritten_lines.append(f"{proxied_line}{SYNTHETIC_SEGMENT_EXTENSION}")
+                            if force_segment_extension:
+                                rewritten_lines.append(
+                                    f"{proxied_line}{SYNTHETIC_SEGMENT_EXTENSION}"
+                                )
+                            else:
+                                rewritten_lines.append(proxied_line)
                         else:
                             rewritten_lines.append(line)
                         expecting_segment_uri = False
