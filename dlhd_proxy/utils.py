@@ -3,13 +3,69 @@ import binascii
 import json
 import os
 import re
+from pathlib import Path
 from typing import Any
 
-key_bytes = os.urandom(64)
+KEY_FILE_ENV_VAR = "DLHD_PROXY_KEY_FILE"
+DEFAULT_KEY_PATH = Path("data/token.key")
+MIN_KEY_LENGTH = 32
+GENERATED_KEY_LENGTH = 64
+PAYLOAD_PREFIX = b"dlhd_proxy::"
+PAYLOAD_PREFIX_STR = PAYLOAD_PREFIX.decode()
+
+
+def _key_file_path() -> Path:
+    raw = os.environ.get(KEY_FILE_ENV_VAR)
+    if raw:
+        return Path(raw).expanduser()
+    return DEFAULT_KEY_PATH
+
+
+def _load_or_create_key() -> bytes:
+    path = _key_file_path()
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError:
+        data = None
+    except OSError as exc:
+        raise RuntimeError(f"Unable to read token key from {path}: {exc}") from exc
+
+    if data is not None:
+        if len(data) < MIN_KEY_LENGTH:
+            raise RuntimeError(
+                f"Token key at {path} must be at least {MIN_KEY_LENGTH} bytes; delete the file to regenerate it."
+            )
+        return data
+
+    key = os.urandom(GENERATED_KEY_LENGTH)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise RuntimeError(f"Unable to prepare key directory {path.parent}: {exc}") from exc
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    mode = 0o600
+    try:
+        fd = os.open(path, flags, mode)
+    except FileExistsError:
+        return _load_or_create_key()
+    except OSError as exc:
+        raise RuntimeError(f"Unable to create token key at {path}: {exc}") from exc
+
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(key)
+    except OSError as exc:
+        raise RuntimeError(f"Unable to write token key to {path}: {exc}") from exc
+
+    return key
+
+
+key_bytes = _load_or_create_key()
 
 
 def encrypt(input_string: str):
-    input_bytes = input_string.encode()
+    input_bytes = PAYLOAD_PREFIX + input_string.encode()
     result = xor(input_bytes)
     return base64.urlsafe_b64encode(result).decode().rstrip('=')
 
@@ -26,9 +82,12 @@ def decrypt(input_string: str):
         raise ValueError("Invalid encrypted payload") from exc
     result = xor(input_bytes)
     try:
-        return result.decode()
+        decoded = result.decode()
     except UnicodeDecodeError as exc:
         raise ValueError("Invalid encrypted payload") from exc
+    if not decoded.startswith(PAYLOAD_PREFIX_STR):
+        raise ValueError("Invalid encrypted payload")
+    return decoded[len(PAYLOAD_PREFIX_STR):]
 
 
 def xor(input_bytes):
