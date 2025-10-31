@@ -110,12 +110,16 @@ def test_stream_proxies_ts_segments_but_not_php(monkeypatch):
     m3u8_text = """#EXTM3U
 #EXT-X-KEY:METHOD=AES-128,URI=\"https://example.com/key.key\"
 #EXTINF:4.0,
+#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:00Z
 https://cdn.example.com/video1.ts
 #EXTINF:8.0,
+#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:08Z
 https://cdn.example.com/variant.m3u8
 #EXTINF:1.0,
+#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:09Z
 https://cdn.example.com/thumbnail.png
 #EXTINF:2.0,
+#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:11Z
 https://api.example.com/segment.php?id=1
 """
 
@@ -187,10 +191,13 @@ def test_stream_proxies_hls_when_proxy_disabled(monkeypatch):
     iframe_html = '<iframe src="https://example.com/embed" width="100%" height="100%"></iframe>'
     m3u8_text = """#EXTM3U
 #EXTINF:4.0,
+#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:00Z
 https://cdn.example.com/video1.ts
 #EXTINF:8.0,
+#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:08Z
 https://cdn.example.com/variant.m3u8
 #EXTINF:1.0,
+#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:09Z
 https://cdn.example.com/thumbnail.png
 """
 
@@ -244,10 +251,13 @@ def test_stream_keeps_all_segments_for_web_player(monkeypatch):
     iframe_html = '<iframe src="https://example.com/embed" width="100%" height="100%"></iframe>'
     m3u8_text = """#EXTM3U
 #EXTINF:4.0,
+#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:00Z
 https://cdn.example.com/video1.ts
 #EXTINF:1.0,
+#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:09Z
 https://cdn.example.com/thumbnail.png
 #EXTINF:2.0,
+#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:11Z
 https://api.example.com/segment.php?id=1
 """
 

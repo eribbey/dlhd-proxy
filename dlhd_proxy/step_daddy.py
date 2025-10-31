@@ -33,6 +33,10 @@ PROXYABLE_HLS_EXTENSIONS = {
 }
 
 MEDIA_SEGMENT_TAGS = ("#EXTINF", "#EXT-X-BYTERANGE")
+SEGMENT_URI_CONTINUATION_TAGS = (
+    "#EXT-X-PROGRAM-DATE-TIME",
+    "#EXT-X-DATERANGE",
+)
 NON_MEDIA_EXTENSIONS = {
     ".png",
     ".jpg",
@@ -181,7 +185,8 @@ class StepDaddy:
 
         def drop_pending_media_tags() -> None:
             while rewritten_lines and any(
-                rewritten_lines[-1].startswith(tag) for tag in MEDIA_SEGMENT_TAGS
+                rewritten_lines[-1].startswith(tag)
+                for tag in (*MEDIA_SEGMENT_TAGS, *SEGMENT_URI_CONTINUATION_TAGS)
             ):
                 rewritten_lines.pop()
 
@@ -199,6 +204,10 @@ class StepDaddy:
             if line.startswith("#"):
                 if any(line.startswith(tag) for tag in MEDIA_SEGMENT_TAGS):
                     expecting_segment_uri = True
+                elif expecting_segment_uri and any(
+                    line.startswith(tag) for tag in SEGMENT_URI_CONTINUATION_TAGS
+                ):
+                    pass
                 else:
                     expecting_segment_uri = False
                 rewritten_lines.append(line)
