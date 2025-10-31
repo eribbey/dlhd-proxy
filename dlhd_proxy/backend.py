@@ -172,7 +172,8 @@ async def key(url: str, host: str):
 @fastapi_app.get("/content/{path}")
 async def content(path: str):
     try:
-        url = step_daddy.content_url(path)
+        normalized_path = StepDaddy._strip_content_extension(path)
+        url = step_daddy.content_url(normalized_path)
     except Exception as exc:
         logger.warning("Invalid content path provided: %s", exc)
         return JSONResponse(
