@@ -226,8 +226,9 @@ https://cdn.example.com/thumbnail.png
 
     playlist = asyncio.run(step_daddy.stream("42"))
 
-    ts_line = f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts)"
-    m3u8_line = f"{config.api_url}/content/enc(https://cdn.example.com/variant.m3u8)"
-    assert ts_line in playlist
-    assert m3u8_line in playlist
+    assert "#EXTINF:4.0," in playlist
+    assert "#EXTINF:8.0," in playlist
+    assert "https://cdn.example.com/video1.ts" in playlist
+    assert "https://cdn.example.com/variant.m3u8" in playlist
     assert "https://cdn.example.com/thumbnail.png" not in playlist
+    assert "#EXTINF:1.0," not in playlist
