@@ -115,7 +115,7 @@ class StepDaddy:
                 key=lambda channel: (channel.name.startswith("18"), channel.name),
             )
 
-    async def stream(self, channel_id: str):
+    async def stream(self, channel_id: str, *, strict: bool = True):
         key = "CHANNEL_KEY"
         url = f"{self._base_url}/stream/stream-{channel_id}.php"
         response = await self._get(url, headers=self._headers())
@@ -166,17 +166,22 @@ class StepDaddy:
             if line.startswith("http"):
                 parsed_url = urlparse(line)
                 path = (parsed_url.path or "").lower()
+                proxied_line = (
+                    f"{config.api_url}/content/{encrypt(line)}"
+                    if config.proxy_content
+                    else line
+                )
+
                 if _is_hls_path(path):
-                    if config.proxy_content:
-                        rewritten_lines.append(
-                            f"{config.api_url}/content/{encrypt(line)}"
-                        )
-                    else:
-                        rewritten_lines.append(line)
+                    rewritten_lines.append(proxied_line)
                     continue
 
-                if rewritten_lines and rewritten_lines[-1].startswith("#EXTINF"):
-                    rewritten_lines.pop()
+                if strict:
+                    if rewritten_lines and rewritten_lines[-1].startswith("#EXTINF"):
+                        rewritten_lines.pop()
+                    continue
+
+                rewritten_lines.append(proxied_line)
                 continue
 
             rewritten_lines.append(line)

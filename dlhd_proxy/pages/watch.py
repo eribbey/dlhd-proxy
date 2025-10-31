@@ -35,6 +35,13 @@ class WatchState(rx.State):
         return f"{config.api_url}/stream/{channel_id}.m3u8"
 
     @rx.var
+    def player_src(self) -> str:
+        channel_id = self.channel_id
+        if not channel_id:
+            return ""
+        return f"{config.api_url}/stream/{channel_id}.m3u8?strict=false"
+
+    @rx.var
     def is_loading(self) -> bool:
         return not backend.get_channels()
 
@@ -179,7 +186,7 @@ def watch() -> rx.Component:
     channel_player = rx.box(
         media_player(
             title=WatchState.channel.name,
-            src=WatchState.url,
+            src=WatchState.player_src,
         ),
         width="100%",
     )
