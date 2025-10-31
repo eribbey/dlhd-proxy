@@ -32,6 +32,24 @@ PROXYABLE_HLS_EXTENSIONS = {
     ".mp3",
 }
 
+MEDIA_SEGMENT_TAGS = ("#EXTINF", "#EXT-X-BYTERANGE")
+NON_MEDIA_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".ico",
+    ".bmp",
+}
+SYNTHETIC_SEGMENT_EXTENSION = ".ts"
+
+
+def _is_obvious_metadata_path(path: str) -> bool:
+    suffix = Path(path).suffix.lower()
+    return suffix in NON_MEDIA_EXTENSIONS
+
 
 def _is_hls_path(path: str) -> bool:
     """Return ``True`` when *path* points to a proxyable HLS asset."""
@@ -153,6 +171,14 @@ class StepDaddy:
             server_url, headers=self._headers(quote(str(source_url)))
         )
         rewritten_lines: list[str] = []
+        expecting_segment_uri = False
+
+        def drop_pending_media_tags() -> None:
+            while rewritten_lines and any(
+                rewritten_lines[-1].startswith(tag) for tag in MEDIA_SEGMENT_TAGS
+            ):
+                rewritten_lines.pop()
+
         for line in m3u8.text.splitlines():
             if line.startswith("#EXT-X-KEY:"):
                 original_url = re.search(r'URI="(.*?)"', line).group(1)
@@ -161,30 +187,55 @@ class StepDaddy:
                     f"{config.api_url}/key/{encrypt(original_url)}/{encrypt(urlparse(source_url).netloc)}",
                 )
                 rewritten_lines.append(line)
+                expecting_segment_uri = False
+                continue
+
+            if line.startswith("#"):
+                if any(line.startswith(tag) for tag in MEDIA_SEGMENT_TAGS):
+                    expecting_segment_uri = True
+                else:
+                    expecting_segment_uri = False
+                rewritten_lines.append(line)
                 continue
 
             if line.startswith("http"):
                 parsed_url = urlparse(line)
-                path = (parsed_url.path or "").lower()
-                proxied_line = (
-                    f"{config.api_url}/content/{encrypt(line)}"
-                    if config.proxy_content
-                    else line
-                )
+                path = parsed_url.path or ""
+                lower_path = path.lower()
+                if config.proxy_content:
+                    token = encrypt(line)
+                    proxied_line = f"{config.api_url}/content/{token}"
+                else:
+                    proxied_line = line
 
-                if _is_hls_path(path):
+                if _is_hls_path(lower_path):
                     rewritten_lines.append(proxied_line)
+                    expecting_segment_uri = False
                     continue
 
                 if strict:
-                    if rewritten_lines and rewritten_lines[-1].startswith("#EXTINF"):
-                        rewritten_lines.pop()
+                    if _is_obvious_metadata_path(lower_path):
+                        drop_pending_media_tags()
+                        expecting_segment_uri = False
+                        continue
+
+                    if expecting_segment_uri:
+                        if config.proxy_content:
+                            rewritten_lines.append(f"{proxied_line}{SYNTHETIC_SEGMENT_EXTENSION}")
+                        else:
+                            rewritten_lines.append(line)
+                        expecting_segment_uri = False
+                        continue
+
+                    expecting_segment_uri = False
                     continue
 
                 rewritten_lines.append(proxied_line)
+                expecting_segment_uri = False
                 continue
 
             rewritten_lines.append(line)
+            expecting_segment_uri = False
 
         return "\n".join(rewritten_lines) + "\n"
 
@@ -199,8 +250,15 @@ class StepDaddy:
         return response.content
 
     @staticmethod
+    def _strip_content_extension(token: str) -> str:
+        suffix = Path(token).suffix.lower()
+        if suffix and suffix in PROXYABLE_HLS_EXTENSIONS:
+            return token[: -len(suffix)]
+        return token
+
+    @staticmethod
     def content_url(path: str):
-        return decrypt(path)
+        return decrypt(StepDaddy._strip_content_extension(path))
 
     def playlist(self, channels: Iterable[Channel] | None = None):
         data = "#EXTM3U\n"

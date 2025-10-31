@@ -1,7 +1,7 @@
 import asyncio
 
 from dlhd_proxy.step_daddy import Channel, StepDaddy
-from dlhd_proxy.utils import urlsafe_base64
+from dlhd_proxy.utils import encrypt, urlsafe_base64
 from rxconfig import config
 
 
@@ -169,12 +169,18 @@ https://api.example.com/segment.php?id=1
 
     ts_line = f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts)"
     m3u8_line = f"{config.api_url}/content/enc(https://cdn.example.com/variant.m3u8)"
+    php_line = (
+        f"{config.api_url}/content/enc(https://api.example.com/segment.php?id=1).ts"
+    )
+    playlist_lines = playlist.splitlines()
+
     assert ts_line in playlist
     assert m3u8_line in playlist
+    assert php_line in playlist
     assert "https://cdn.example.com/thumbnail.png" not in playlist
-    assert "https://api.example.com/segment.php?id=1" not in playlist
+    assert "https://api.example.com/segment.php?id=1" not in playlist_lines
     assert "#EXTINF:1.0," not in playlist
-    assert "#EXTINF:2.0," not in playlist
+    assert "#EXTINF:2.0," in playlist
 
 
 def test_stream_proxies_hls_when_proxy_disabled(monkeypatch):
@@ -286,9 +292,21 @@ https://api.example.com/segment.php?id=1
     ts_line = f"{config.api_url}/content/enc(https://cdn.example.com/video1.ts)"
     png_line = f"{config.api_url}/content/enc(https://cdn.example.com/thumbnail.png)"
     php_line = f"{config.api_url}/content/enc(https://api.example.com/segment.php?id=1)"
+    synthetic_php_line = (
+        f"{config.api_url}/content/enc(https://api.example.com/segment.php?id=1).ts"
+    )
 
     assert ts_line in playlist
     assert png_line in playlist
     assert php_line in playlist
+    assert synthetic_php_line not in playlist
     assert "#EXTINF:1.0," in playlist
     assert "#EXTINF:2.0," in playlist
+
+
+def test_content_url_supports_synthetic_extension():
+    original_url = "https://cdn.example.com/segment.php?id=7"
+    token = encrypt(original_url)
+
+    assert StepDaddy.content_url(token) == original_url
+    assert StepDaddy.content_url(f"{token}.ts") == original_url
