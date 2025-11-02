@@ -9,3 +9,5 @@ __pycache__/
 .env
 guide.xml
 channels.json
+logo-cache/
+dlhd_proxy.log
