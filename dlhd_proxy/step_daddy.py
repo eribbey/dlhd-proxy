@@ -157,6 +157,16 @@ class StepDaddy:
             raise ValueError(
                 f"Invalid auth host {raw_auth_url!r}: missing scheme or hostname"
             )
+        try:
+            port = parsed_auth_url.port
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid auth host {raw_auth_url!r}: port must be numeric"
+            ) from exc
+        if ":" in parsed_auth_url.netloc and port is None:
+            raise ValueError(
+                f"Invalid auth host {raw_auth_url!r}: missing port number"
+            )
         auth_base = parsed_auth_url._replace(path=parsed_auth_url.path or "/").geturl()
         auth_request_url = urljoin(
             auth_base,
