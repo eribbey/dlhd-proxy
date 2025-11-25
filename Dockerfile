@@ -8,6 +8,10 @@ ARG API_URL
 # Multi-arch builder for ARM (e.g., Raspberry Pi) and x86
 FROM --platform=$BUILDPLATFORM python:3.11-slim AS builder
 
+# Install system dependencies required by Reflex (e.g., unzip for Bun installer)
+RUN apt-get update -y && apt-get install -y --no-install-recommends unzip \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1
 RUN python -m venv /app/.venv && mkdir -p /app/.web
 ENV PATH="/app/.venv/bin:$PATH"
