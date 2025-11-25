@@ -152,6 +152,45 @@ def test_get_uses_flaresolverr_for_dlhd_domain(monkeypatch, caplog):
     assert any("via Flaresolverr" in record.getMessage() for record in caplog.records)
 
 
+def test_stream_rejects_invalid_auth_host_port(monkeypatch):
+    step_daddy = StepDaddy()
+
+    class FakeResponse:
+        def __init__(self, text: str, status_code: int = 200):
+            self.text = text
+            self.status_code = status_code
+
+        def json(self):  # pragma: no cover - defensive
+            raise AssertionError("json should not be called")
+
+    responses = [
+        FakeResponse('<iframe src="https://source.example/player" width="640"></iframe>'),
+        FakeResponse('const CHANNEL_KEY = "channel123";'),
+    ]
+
+    async def fake_get(_url: str, **_kwargs):
+        if not responses:
+            raise AssertionError("Unexpected _get call")
+        return responses.pop(0)
+
+    monkeypatch.setattr(step_daddy, "_get", fake_get)
+
+    def fake_decode_bundle(_text: str):
+        return {
+            "b_ts": "1",
+            "b_sig": "sig",
+            "b_rnd": "rnd",
+            "b_host": "https://auth.example.com:notaport/path",
+        }
+
+    monkeypatch.setattr("dlhd_proxy.step_daddy.decode_bundle", fake_decode_bundle)
+
+    with pytest.raises(ValueError) as excinfo:
+        asyncio.run(step_daddy.stream("123"))
+
+    assert "port" in str(excinfo.value)
+
+
 class FakeCookie:
     def __init__(self, name: str, value: str, domain: str = "", expires: float | None = None):
         self.name = name
