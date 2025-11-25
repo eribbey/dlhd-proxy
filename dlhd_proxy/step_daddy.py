@@ -8,7 +8,7 @@ from http.cookies import SimpleCookie
 from importlib import resources
 from pathlib import Path
 from typing import Iterable, List
-from urllib.parse import parse_qs, quote, urlparse, urlsplit
+from urllib.parse import parse_qs, quote, urljoin, urlparse, urlsplit
 
 import reflex as rx
 from curl_cffi import AsyncSession
@@ -150,8 +150,18 @@ class StepDaddy:
         auth_ts = data.get("b_ts", "")
         auth_sig = data.get("b_sig", "")
         auth_rnd = data.get("b_rnd", "")
-        auth_url = data.get("b_host", "")
-        auth_request_url = f"{auth_url}auth.php?channel_id={channel_key}&ts={auth_ts}&rnd={auth_rnd}&sig={auth_sig}"
+        raw_auth_url = data.get("b_host", "")
+        auth_url = raw_auth_url.strip(" :")
+        parsed_auth_url = urlparse(auth_url)
+        if not parsed_auth_url.scheme or not parsed_auth_url.netloc:
+            raise ValueError(
+                f"Invalid auth host {raw_auth_url!r}: missing scheme or hostname"
+            )
+        auth_base = parsed_auth_url._replace(path=parsed_auth_url.path or "/").geturl()
+        auth_request_url = urljoin(
+            auth_base,
+            f"auth.php?channel_id={channel_key}&ts={auth_ts}&rnd={auth_rnd}&sig={auth_sig}",
+        )
         auth_response = await self._get(
             auth_request_url, headers=self._headers(source_url)
         )
@@ -160,13 +170,30 @@ class StepDaddy:
         key_url = urlparse(source_url)
         key_url = f"{key_url.scheme}://{key_url.netloc}/server_lookup.php?channel_id={channel_key}"
         key_response = await self._get(key_url, headers=self._headers(source_url))
-        server_key = key_response.json().get("server_key")
-        if not server_key:
+        raw_server_key = key_response.json().get("server_key")
+        if not raw_server_key:
             raise ValueError("No server key found in response")
+        cleaned_server_key = raw_server_key.strip()
+        if ":" in cleaned_server_key:
+            raise ValueError(
+                f"Invalid server key {raw_server_key!r}: unexpected characters in hostname"
+            )
+        server_key = cleaned_server_key.strip(" /")
+        if not server_key:
+            raise ValueError(f"Invalid server key {raw_server_key!r}: missing scheme or hostname")
         if server_key == "top1/cdn":
-            server_url = f"https://top1.newkso.ru/top1/cdn/{channel_key}/mono.m3u8"
+            server_base = "https://top1.newkso.ru/"
+            server_url = urljoin(server_base, f"{server_key}/{channel_key}/mono.m3u8")
         else:
-            server_url = f"https://{server_key}new.newkso.ru/{server_key}/{channel_key}/mono.m3u8"
+            server_base = f"https://{server_key}new.newkso.ru/"
+            parsed_server_base = urlparse(server_base)
+            if not parsed_server_base.scheme or not parsed_server_base.netloc:
+                raise ValueError(
+                    f"Invalid server key {raw_server_key!r}: missing scheme or hostname"
+                )
+            server_url = urljoin(
+                parsed_server_base.geturl(), f"{server_key}/{channel_key}/mono.m3u8"
+            )
         m3u8 = await self._get(
             server_url, headers=self._headers(quote(str(source_url)))
         )
