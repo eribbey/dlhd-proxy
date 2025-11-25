@@ -2,7 +2,9 @@
 
 This is a fork of a self-hosted IPTV proxy built with [Reflex](https://reflex.dev), enabling you to watch over 1,000 📺 TV channels and search for live events or sports matches ⚽🏀. Stream directly in your browser 🌐 or through any media player client 🎶. You can also download the entire playlist (`playlist.m3u8`) and integrate it with platforms like Jellyfin 🍇 or other IPTV media players.
 
-**10/19/25 - Updated in accordance with DLHD API changes from upstream repo. Should be working again.** 
+**10/19/25 - Updated in accordance with DLHD API changes from upstream repo. Should be working again.**
+
+**02/05/26 - Upstream domain changed to `dlhd.dad` and now requires Flaresolverr for page loads.**
 
 **If using Jellyfin for IPTV, use version 10.10.7 for now. If using Jellyfin 10.11+, use Dispatcharr to re-stream with "streamlink" stream profile for now.**
 
@@ -56,6 +58,8 @@ docker run -p 3000:3000 dlhd-proxy
 - **PORT**: Set a custom port for the server.
 - **API_URL**: Set the domain or IP where the server is reachable.
 - **SOCKS5**: Proxy DLHD traffic through a SOCKS5 server if needed.
+- **FLARESOLVERR_URL** *(recommended)*: Endpoint for your Flaresolverr instance (e.g., `http://localhost:8191/v1`). Requests to `dlhd.dad` are routed through Flaresolverr when this is set.
+- **FLARESOLVERR_TIMEOUT**: Timeout (in seconds) for Flaresolverr requests (default: `60`).
 - **PROXY_CONTENT**: Proxy video content itself through your server (optional).
 - **TZ**: Timezone used for schedules and guide generation (e.g., `America/New_York`).
 - **GUIDE_UPDATE**: Daily time (`HH:MM`) to refresh `guide.xml`.

@@ -1,7 +1,7 @@
-import json
 import html
 import logging
 import re
+import json
 from importlib import resources
 from pathlib import Path
 from typing import Iterable, List
@@ -33,6 +33,18 @@ PROXYABLE_HLS_EXTENSIONS = {
 }
 
 
+class _FlaresolverrResponse:
+    def __init__(self, solution: dict):
+        self.status_code = int(solution.get("status") or 0)
+        self.text = solution.get("response") or ""
+        self.content = self.text.encode()
+        self.headers = solution.get("headers") or {}
+        self.url = solution.get("url") or ""
+
+    def json(self):
+        return json.loads(self.text)
+
+
 def _is_hls_path(path: str) -> bool:
     """Return ``True`` when *path* points to a proxyable HLS asset."""
 
@@ -54,14 +66,16 @@ class StepDaddy:
             self._session = AsyncSession(proxy="socks5://" + socks5)
         else:
             self._session = AsyncSession()
-        self._base_url = "https://daddylivestream.com"
+        self._base_url = "https://dlhd.dad"
+        self._flaresolverr_url = config.flaresolverr_url
+        self._flaresolverr_timeout = config.flaresolverr_timeout
         self.channels: list[Channel] = []
         try:
             meta_data = resources.files(__package__).joinpath("meta.json").read_text()
             self._meta = json.loads(meta_data)
         except Exception:
             self._meta = {}
-        self._logged_domains = {"daddylivestream.com", "dlhd.dad"}
+        self._logged_domains = {"dlhd.dad"}
 
     def _headers(self, referer: str = None, origin: str = None):
         if referer is None:
@@ -107,7 +121,7 @@ class StepDaddy:
                         logo=logo,
                     )
                 )
-            logger.info("Loaded %d channels from daddylivestream.com", len(channels))
+            logger.info("Loaded %d channels from dlhd.dad", len(channels))
         finally:
             self._enumerate_duplicate_names(channels)
             self.channels = sorted(
@@ -360,22 +374,79 @@ class StepDaddy:
         return any(netloc.endswith(domain) for domain in self._logged_domains)
 
     async def _get(self, url: str, **kwargs):
+        use_flaresolverr = self._should_use_flaresolverr(url)
+        transport = " via Flaresolverr" if use_flaresolverr else ""
         try:
-            response = await self._session.get(url, **kwargs)
+            if use_flaresolverr:
+                response = await self._flaresolverr_get(url, **kwargs)
+            else:
+                response = await self._session.get(url, **kwargs)
         except Exception:
             if self._should_log_url(url):
-                logger.exception("Request to %s failed", url)
+                logger.exception("Request to %s%s failed", url, transport)
             raise
         if self._should_log_url(url):
             if response.status_code >= 400:
                 logger.warning(
-                    "Request to %s returned HTTP %s", url, response.status_code
+                    "Request to %s%s returned HTTP %s",
+                    url,
+                    transport,
+                    response.status_code,
                 )
             else:
                 logger.info(
-                    "Request to %s succeeded with HTTP %s", url, response.status_code
+                    "Request to %s%s succeeded with HTTP %s",
+                    url,
+                    transport,
+                    response.status_code,
                 )
         return response
+
+    def _should_use_flaresolverr(self, url: str) -> bool:
+        netloc = urlsplit(url).netloc.lower()
+        flaresolverr_url = self._flaresolverr_url or config.flaresolverr_url
+        return bool(flaresolverr_url) and netloc.endswith("dlhd.dad")
+
+    async def _flaresolverr_get(self, url: str, headers=None, timeout: int | None = None, **_kwargs):
+        flaresolverr_url = self._flaresolverr_url or config.flaresolverr_url
+        if not flaresolverr_url:
+            raise ValueError("Flaresolverr is not configured")
+
+        self._flaresolverr_url = flaresolverr_url
+        payload = {
+            "cmd": "request.get",
+            "url": url,
+            "maxTimeout": int((timeout or self._flaresolverr_timeout) * 1000),
+        }
+        if headers:
+            payload["headers"] = headers
+
+        try:
+            response = await self._session.post(
+                flaresolverr_url,
+                json=payload,
+                timeout=timeout or self._flaresolverr_timeout,
+            )
+        except Exception:
+            logger.exception("Flaresolverr request to %s failed", url)
+            raise
+
+        if response.status_code >= 400:
+            raise ValueError(
+                f"Flaresolverr request failed with HTTP {response.status_code}"
+            )
+
+        try:
+            payload = response.json()
+        except Exception as exc:
+            raise ValueError("Invalid Flaresolverr response") from exc
+
+        if payload.get("status") != "ok":
+            message = payload.get("message") or "Unknown Flaresolverr error"
+            raise ValueError(message)
+
+        solution = payload.get("solution") or {}
+        return _FlaresolverrResponse(solution)
 
     @staticmethod
     def _enumerate_duplicate_names(channels: Iterable[Channel]) -> None:
