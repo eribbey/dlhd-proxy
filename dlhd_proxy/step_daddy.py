@@ -2,6 +2,9 @@ import html
 import logging
 import re
 import json
+import time
+import email.utils
+from http.cookies import SimpleCookie
 from importlib import resources
 from pathlib import Path
 from typing import Iterable, List
@@ -76,6 +79,7 @@ class StepDaddy:
         except Exception:
             self._meta = {}
         self._logged_domains = {"dlhd.dad"}
+        self._last_transport_mode: bool | None = None
 
     def _headers(self, referer: str = None, origin: str = None):
         if referer is None:
@@ -373,6 +377,23 @@ class StepDaddy:
             if self._should_log_url(url):
                 logger.exception("Request to %s%s failed", url, transport)
             raise
+
+        if (
+            not use_flaresolverr
+            and response.status_code in {401, 403}
+            and self._can_use_flaresolverr(url)
+        ):
+            if self._should_log_url(url):
+                logger.info(
+                    "Switching transport to Flaresolverr for %s after HTTP %s",
+                    url,
+                    response.status_code,
+                )
+            use_flaresolverr = True
+            transport = " via Flaresolverr"
+            response = await self._flaresolverr_get(url, **kwargs)
+
+        self._log_transport_change(use_flaresolverr, url)
         if self._should_log_url(url):
             if response.status_code >= 400:
                 logger.warning(
@@ -391,9 +412,16 @@ class StepDaddy:
         return response
 
     def _should_use_flaresolverr(self, url: str) -> bool:
-        netloc = urlsplit(url).netloc.lower()
+        if not self._can_use_flaresolverr(url):
+            return False
+
+        hostname = (urlsplit(url).hostname or "").lower()
+        return not self._has_valid_cookie(hostname)
+
+    def _can_use_flaresolverr(self, url: str) -> bool:
+        hostname = (urlsplit(url).hostname or "").lower()
         flaresolverr_url = self._flaresolverr_url or config.flaresolverr_url
-        return bool(flaresolverr_url) and netloc.endswith("dlhd.dad")
+        return bool(flaresolverr_url) and hostname.endswith("dlhd.dad")
 
     async def _flaresolverr_get(self, url: str, headers=None, timeout: int | None = None, **_kwargs):
         flaresolverr_url = self._flaresolverr_url or config.flaresolverr_url
@@ -434,7 +462,78 @@ class StepDaddy:
             raise ValueError(message)
 
         solution = payload.get("solution") or {}
+        self._store_solution_cookies(url, solution.get("headers") or {})
         return _FlaresolverrResponse(solution)
+
+    def _store_solution_cookies(self, url: str, headers: dict) -> None:
+        cookies_raw: list[str] = []
+        for key, value in headers.items():
+            if key.lower() != "set-cookie":
+                continue
+
+            if isinstance(value, list):
+                cookies_raw.extend([str(item) for item in value])
+            else:
+                cookies_raw.append(str(value))
+
+        if not cookies_raw:
+            return
+
+        hostname = (urlsplit(url).hostname or "dlhd.dad").lower()
+        now = time.time()
+
+        for raw_cookie in cookies_raw:
+            parsed = SimpleCookie()
+            parsed.load(raw_cookie)
+            for morsel in parsed.values():
+                expires = None
+                if morsel["max-age"]:
+                    try:
+                        expires = now + int(morsel["max-age"])
+                    except (TypeError, ValueError):  # pragma: no cover - defensive
+                        expires = None
+                elif morsel["expires"]:
+                    try:
+                        expires_dt = email.utils.parsedate_to_datetime(morsel["expires"])
+                        expires = expires_dt.timestamp()
+                    except (TypeError, ValueError, OverflowError):  # pragma: no cover
+                        expires = None
+
+                domain = morsel["domain"] or hostname
+                path = morsel["path"] or "/"
+                self._session.cookies.set(
+                    morsel.key, morsel.value, domain=domain, path=path, expires=expires
+                )
+
+    def _has_valid_cookie(self, hostname: str) -> bool:
+        now = time.time()
+        cookies = getattr(self._session, "cookies", None)
+        if cookies is None:  # pragma: no cover - defensive
+            return False
+
+        for cookie in cookies:
+            domain = (cookie.domain or "").lstrip(".").lower()
+            if domain and not hostname.endswith(domain):
+                continue
+
+            if cookie.expires is None or cookie.expires > now:
+                return True
+
+        return False
+
+    def _log_transport_change(self, using_flaresolverr: bool, url: str) -> None:
+        previous_mode = self._last_transport_mode
+        self._last_transport_mode = using_flaresolverr
+
+        if previous_mode is None or previous_mode == using_flaresolverr:
+            return
+
+        if not self._should_log_url(url):  # pragma: no cover - logging scope guard
+            return
+
+        mode_label = "Flaresolverr" if using_flaresolverr else "direct"
+        netloc = urlsplit(url).netloc
+        logger.info("Transport for %s switched to %s", netloc, mode_label)
 
     @staticmethod
     def _enumerate_duplicate_names(channels: Iterable[Channel]) -> None:

@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from dlhd_proxy.step_daddy import Channel, StepDaddy
 from dlhd_proxy.utils import urlsafe_base64
@@ -121,6 +122,9 @@ def test_get_uses_flaresolverr_for_dlhd_domain(monkeypatch, caplog):
             return self._json_data
 
     class FakeSession:
+        def __init__(self):
+            self.cookies = FakeCookieJar()
+
         async def post(self, url: str, json=None, timeout=None, **_kwargs):
             assert url == config.flaresolverr_url
             assert json["url"] == "https://dlhd.dad/example"
@@ -144,6 +148,116 @@ def test_get_uses_flaresolverr_for_dlhd_domain(monkeypatch, caplog):
     assert response.status_code == 200
     assert response.json() == {}
     assert any("via Flaresolverr" in record.getMessage() for record in caplog.records)
+
+
+class FakeCookie:
+    def __init__(self, name: str, value: str, domain: str = "", expires: float | None = None):
+        self.name = name
+        self.value = value
+        self.domain = domain
+        self.expires = expires
+
+
+class FakeCookieJar(list):
+    def set(self, name, value, domain=None, path="/", expires=None):  # pragma: no cover - simple storage
+        self.append(FakeCookie(name, value, domain or "", expires))
+
+
+def test_flaresolverr_cookies_enable_direct_requests(monkeypatch, caplog):
+    caplog.set_level("INFO")
+    monkeypatch.setattr(config, "flaresolverr_url", "http://solver:8191/v1", raising=False)
+
+    class FakeResponse:
+        def __init__(self, json_data=None, status_code: int = 200):
+            self._json_data = json_data or {}
+            self.status_code = status_code
+
+        def json(self):
+            return self._json_data
+
+    class FakeSession:
+        def __init__(self):
+            self.cookies = FakeCookieJar()
+            self.direct_calls = 0
+            self.flaresolverr_calls = 0
+
+        async def post(self, *_args, **_kwargs):
+            self.flaresolverr_calls += 1
+            return FakeResponse(
+                {
+                    "status": "ok",
+                    "solution": {
+                        "status": 200,
+                        "response": "{}",
+                        "url": "https://dlhd.dad/example",
+                        "headers": {
+                            "Set-Cookie": "session=abc123; Max-Age=60; Domain=dlhd.dad; Path=/",
+                        },
+                    },
+                }
+            )
+
+        async def get(self, *_args, **_kwargs):
+            self.direct_calls += 1
+            return FakeResponse({"ok": True}, status_code=200)
+
+    step_daddy = StepDaddy()
+    step_daddy._flaresolverr_url = config.flaresolverr_url
+    step_daddy._session = FakeSession()
+
+    first_response = asyncio.run(step_daddy._get("https://dlhd.dad/example"))
+    assert first_response.status_code == 200
+    assert step_daddy._session.flaresolverr_calls == 1
+
+    second_response = asyncio.run(step_daddy._get("https://dlhd.dad/example"))
+    assert second_response.status_code == 200
+    assert step_daddy._session.direct_calls == 1
+    assert step_daddy._session.flaresolverr_calls == 1
+    assert any("Transport" in record.getMessage() for record in caplog.records)
+
+
+def test_direct_requests_fall_back_on_403(monkeypatch, caplog):
+    caplog.set_level("INFO")
+    monkeypatch.setattr(config, "flaresolverr_url", "http://solver:8191/v1", raising=False)
+
+    class FakeResponse:
+        def __init__(self, json_data=None, status_code: int = 200):
+            self._json_data = json_data or {}
+            self.status_code = status_code
+
+        def json(self):
+            return self._json_data
+
+    class FakeSession:
+        def __init__(self):
+            self.cookies = FakeCookieJar(
+                [FakeCookie("session", "abc123", "dlhd.dad", time.time() + 60)]
+            )
+            self.direct_calls = 0
+            self.flaresolverr_calls = 0
+
+        async def get(self, *_args, **_kwargs):
+            self.direct_calls += 1
+            return FakeResponse(status_code=403)
+
+        async def post(self, *_args, **_kwargs):
+            self.flaresolverr_calls += 1
+            return FakeResponse(
+                {
+                    "status": "ok",
+                    "solution": {"status": 200, "response": "{}", "url": "https://dlhd.dad/example"},
+                }
+            )
+
+    step_daddy = StepDaddy()
+    step_daddy._flaresolverr_url = config.flaresolverr_url
+    step_daddy._session = FakeSession()
+
+    response = asyncio.run(step_daddy._get("https://dlhd.dad/example"))
+    assert response.status_code == 200
+    assert step_daddy._session.direct_calls == 1
+    assert step_daddy._session.flaresolverr_calls == 1
+    assert any("Switching transport" in record.getMessage() for record in caplog.records)
 
 
 def test_stream_proxies_hls_and_preserves_non_hls_when_proxy_enabled(monkeypatch):
