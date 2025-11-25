@@ -4,7 +4,7 @@ This is a fork of a self-hosted IPTV proxy built with [Reflex](https://reflex.de
 
 **10/19/25 - Updated in accordance with DLHD API changes from upstream repo. Should be working again.**
 
-**02/05/26 - Upstream domain changed to `dlhd.dad` and now requires Flaresolverr for page loads.**
+**11/25/26 - Upstream domain changed to `dlhd.dad` and now requires Flaresolverr for page loads.**
 
 **If using Jellyfin for IPTV, use version 10.10.7 for now. If using Jellyfin 10.11+, use Dispatcharr to re-stream with "streamlink" stream profile for now.**
 
