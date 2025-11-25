@@ -215,27 +215,17 @@ class StepDaddy:
         return data
 
     async def schedule(self):
-        json_url = f"{self._base_url}/schedule/schedule-generated.php"
-        response = await self._get(json_url, headers=self._headers())
-        if response.status_code < 400:
-            return response.json()
-
-        if response.status_code not in {401, 403, 404}:
-            raise ValueError(
-                f"Failed to fetch schedule: HTTP {response.status_code}"
-            )
-
         for path in ("/schedule", "/"):
             try:
                 html_response = await self._get(
                     f"{self._base_url}{path}", headers=self._headers()
                 )
             except Exception as exc:  # pragma: no cover - network failure
-                logger.debug("Schedule fallback request to %s failed: %s", path, exc)
+                logger.debug("Schedule request to %s failed: %s", path, exc)
                 continue
             if html_response.status_code >= 400:
                 logger.debug(
-                    "Schedule fallback %s returned HTTP %s",
+                    "Schedule request %s returned HTTP %s",
                     path,
                     html_response.status_code,
                 )
@@ -243,9 +233,7 @@ class StepDaddy:
             try:
                 schedule = self._parse_schedule_html(html_response.text)
             except ValueError as exc:
-                logger.debug(
-                    "Unable to parse schedule HTML from %s: %s", path, exc
-                )
+                logger.debug("Unable to parse schedule HTML from %s: %s", path, exc)
                 continue
             if schedule:
                 return schedule

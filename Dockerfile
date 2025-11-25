@@ -6,10 +6,10 @@ ARG SOCKS5
 ARG API_URL
 
 # Multi-arch builder for ARM (e.g., Raspberry Pi) and x86
-FROM --platform=$BUILDPLATFORM python:3.11 AS builder
+FROM --platform=$BUILDPLATFORM python:3.11-slim AS builder
 
-RUN mkdir -p /app/.web
-RUN python -m venv /app/.venv
+ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1
+RUN python -m venv /app/.venv && mkdir -p /app/.web
 ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
