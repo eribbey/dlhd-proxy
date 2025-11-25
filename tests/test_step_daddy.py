@@ -99,10 +99,51 @@ def test_load_channels_logs_request_status(monkeypatch, caplog):
 
     messages = [record.getMessage() for record in caplog.records]
     assert any(
-        "Request to https://daddylivestream.com/24-7-channels.php succeeded with HTTP 200"
+        "Request to https://dlhd.dad/24-7-channels.php succeeded with HTTP 200"
         in message
         for message in messages
     )
+
+
+def test_get_uses_flaresolverr_for_dlhd_domain(monkeypatch, caplog):
+    caplog.set_level("INFO")
+    monkeypatch.setattr(config, "flaresolverr_url", "http://solver:8191/v1", raising=False)
+    monkeypatch.setattr(config, "flaresolverr_timeout", 30, raising=False)
+
+    class FakeResponse:
+        def __init__(self, json_data=None, status_code: int = 200):
+            self._json_data = json_data
+            self.status_code = status_code
+
+        def json(self):
+            if self._json_data is None:
+                raise ValueError("missing json")
+            return self._json_data
+
+    class FakeSession:
+        async def post(self, url: str, json=None, timeout=None, **_kwargs):
+            assert url == config.flaresolverr_url
+            assert json["url"] == "https://dlhd.dad/example"
+            return FakeResponse(
+                {
+                    "status": "ok",
+                    "solution": {"status": 200, "response": "{}", "url": json["url"]},
+                }
+            )
+
+        async def get(self, *_args, **_kwargs):  # pragma: no cover - defensive
+            raise AssertionError("Flaresolverr should handle dlhd.dad")
+
+    step_daddy = StepDaddy()
+    step_daddy._flaresolverr_url = config.flaresolverr_url
+    assert step_daddy._should_use_flaresolverr("https://dlhd.dad/example")
+    step_daddy._session = FakeSession()
+
+    response = asyncio.run(step_daddy._get("https://dlhd.dad/example"))
+
+    assert response.status_code == 200
+    assert response.json() == {}
+    assert any("via Flaresolverr" in record.getMessage() for record in caplog.records)
 
 
 def test_stream_proxies_hls_and_preserves_non_hls_when_proxy_enabled(monkeypatch):
