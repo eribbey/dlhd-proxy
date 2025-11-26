@@ -2,9 +2,7 @@
 
 This is a fork of a self-hosted IPTV proxy built with [Reflex](https://reflex.dev), enabling you to watch over 1,000 📺 TV channels and search for live events or sports matches ⚽🏀. Stream directly in your browser 🌐 or through any media player client 🎶. You can also download the entire playlist (`playlist.m3u8`) and integrate it with platforms like Jellyfin 🍇 or other IPTV media players.
 
-**10/19/25 - Updated in accordance with DLHD API changes from upstream repo. Should be working again.**
-
-**11/25/26 - Upstream domain changed to `dlhd.dad` and now requires Flaresolverr for page loads.**
+**11/25/26 - Upstream domain changed to `dlhd.dad` and now requires Flaresolverr for page loads. However, dealing with issue where DLHD has blocked direct access to their streams as well, so currently NOT WORKING.**
 
 **If using Jellyfin for IPTV, use version 10.10.7 for now. If using Jellyfin 10.11+, use Dispatcharr to re-stream with "streamlink" stream profile for now.**
 
