@@ -55,6 +55,7 @@ def navbar(search=None) -> rx.Component:
                         ),
                         align_items="center",
                         gap="0",
+                        cursor="pointer",
                         on_click=rx.redirect("/")
                     ),
                     rx.cond(
