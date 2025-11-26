@@ -145,25 +145,37 @@ class StepDaddy:
             raise ValueError("Failed to find source URL for channel")
 
         channel_key = re.compile(rf"const\s+{re.escape(key)}\s*=\s*\"(.*?)\";").findall(source_response.text)[-1]
+        logger.info("Resolved channel %s to source %s with key %s", channel_id, source_url, channel_key)
 
         data = decode_bundle(source_response.text)
         auth_ts = data.get("b_ts", "")
         auth_sig = data.get("b_sig", "")
         auth_rnd = data.get("b_rnd", "")
         raw_auth_url = data.get("b_host", "")
-        auth_url = raw_auth_url.strip(" :")
+        auth_url = re.sub(r"\s+", "", raw_auth_url.strip())
         parsed_auth_url = urlparse(auth_url)
         if not parsed_auth_url.scheme or not parsed_auth_url.netloc:
             raise ValueError(
                 f"Invalid auth host {raw_auth_url!r}: missing scheme or hostname"
             )
+
+        if ":" in parsed_auth_url.netloc:
+            host, _, port_str = parsed_auth_url.netloc.rpartition(":")
+            if not port_str.isdigit():
+                logger.warning(
+                    "Auth host %r contained a non-numeric port; stripping port and retrying",
+                    raw_auth_url,
+                )
+                parsed_auth_url = parsed_auth_url._replace(netloc=host)
+
         try:
-            port = parsed_auth_url.port
+            parsed_auth_url.port
         except ValueError as exc:
             raise ValueError(
                 f"Invalid auth host {raw_auth_url!r}: port must be numeric"
             ) from exc
-        if ":" in parsed_auth_url.netloc and port is None:
+
+        if ":" in parsed_auth_url.netloc and parsed_auth_url.port is None:
             raise ValueError(
                 f"Invalid auth host {raw_auth_url!r}: missing port number"
             )
@@ -172,6 +184,9 @@ class StepDaddy:
             auth_base,
             f"auth.php?channel_id={channel_key}&ts={auth_ts}&rnd={auth_rnd}&sig={auth_sig}",
         )
+        logger.debug(
+            "Requesting auth for channel %s from %s", channel_id, auth_request_url
+        )
         auth_response = await self._get(
             auth_request_url, headers=self._headers(source_url)
         )
@@ -179,6 +194,7 @@ class StepDaddy:
             raise ValueError("Failed to get auth response")
         key_url = urlparse(source_url)
         key_url = f"{key_url.scheme}://{key_url.netloc}/server_lookup.php?channel_id={channel_key}"
+        logger.debug("Fetching server key for channel %s from %s", channel_id, key_url)
         key_response = await self._get(key_url, headers=self._headers(source_url))
         raw_server_key = key_response.json().get("server_key")
         if not raw_server_key:
@@ -206,6 +222,12 @@ class StepDaddy:
             )
         m3u8 = await self._get(
             server_url, headers=self._headers(quote(str(source_url)))
+        )
+        logger.info(
+            "Retrieved playlist for channel %s from %s (auth host %s)",
+            channel_id,
+            server_url,
+            parsed_auth_url.netloc,
         )
         rewritten_lines: list[str] = []
         for line in m3u8.text.splitlines():
